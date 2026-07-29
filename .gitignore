@@ -99,3 +99,6 @@ htmlcov/
 # ======================================================
 
 .idea/
+
+# Archivos temporales de Microsoft Office
+~$*
