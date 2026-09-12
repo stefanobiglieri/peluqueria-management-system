@@ -7,7 +7,7 @@ from alembic import context
 
 from backend.app.database.database import Base
 from backend.app.core.config import DATABASE_URL
-
+import backend.app.models  # noqa: F401  -> registra todos los modelos en Base.metadata
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
