@@ -12,3 +12,11 @@
 # que en realidad sería un bug, no una regla de negocio.
 class BusinessException(Exception):
     pass
+
+# NotFoundException: representa específicamente el caso "el recurso que
+# pediste no existe" (ej. un usuario con ese id no está en la base).
+# La separamos de BusinessException porque le corresponde un código HTTP
+# distinto (404, no 400) — mezclar ambas obligaría al endpoint a inspeccionar
+# el mensaje de texto para decidir qué status devolver, algo frágil.
+class NotFoundException(Exception):
+    pass

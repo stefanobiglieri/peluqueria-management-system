@@ -1,60 +1,42 @@
-# bcrypt: la librería que reemplaza a passlib para hashear contraseñas.
+# uuid: para tipar el identificador de usuario que reciben las funciones nuevas.
+import uuid
+
+# bcrypt: para hashear contraseñas.
 import bcrypt
 
 # Session: mismo tipo que en el repositorio.
 from sqlalchemy.orm import Session
 
-# Importamos el MÓDULO completo del repositorio (no funciones sueltas).
-# Así, en cada línea donde se usa (ej. "repository.crear(...)"), queda
-# explícito a simple vista que esa operación es un acceso a datos.
+# Importamos el MÓDULO completo del repositorio.
 from backend.app.repositories import usuario_repository as repository
 
-# El modelo real, para construir la instancia que se va a guardar,
-# y el Enum de tipo de login, para comparar contra él.
+# El modelo real y el Enum de tipo de login.
 from backend.app.models.usuario import Usuario, TipoLogin
 
-# El esquema de entrada: datos ya validados por Pydantic (formato de
-# email, reglas de tipo_login/password ya verificadas).
-from backend.app.schemas.usuario import UsuarioCreate
+# Los esquemas de entrada: creación y actualización parcial.
+from backend.app.schemas.usuario import UsuarioCreate, UsuarioUpdate
 
-# Nuestra excepción propia para errores de regla de negocio.
-from backend.app.core.exceptions import BusinessException
+# Nuestras dos excepciones propias.
+from backend.app.core.exceptions import BusinessException, NotFoundException
 
 
 def _hashear_password(password: str) -> str:
-    """
-    Convierte una contraseña en texto plano en su hash con bcrypt.
-    bcrypt trabaja con bytes, no con str, por eso codificamos antes
-    de hashear y decodificamos el resultado para guardarlo como texto
-    normal en password_hash.
-    gensalt() genera una 'sal' aleatoria distinta cada vez, para que
-    dos usuarios con la misma contraseña nunca tengan el mismo hash.
-    """
+    """Convierte una contraseña en texto plano en su hash con bcrypt."""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
     """Aplica las reglas de negocio para dar de alta un Usuario nuevo."""
-
-    # Regla de negocio: rechazar un email ya registrado con un mensaje
-    # claro, ANTES de que la base lo rechace con un UniqueConstraint
-    # (mismo criterio ya aplicado con el CheckConstraint de tipo_login).
     if datos.email and repository.obtener_por_email(db, datos.email):
         raise BusinessException("Ya existe un usuario registrado con ese email.")
 
     if datos.telefono and repository.obtener_por_telefono(db, datos.telefono):
         raise BusinessException("Ya existe un usuario registrado con ese teléfono.")
 
-    # Solo hasheamos contraseña si el login es por EMAIL. Si es por
-    # TELEFONO, datos.password ya viene en None (lo garantiza el
-    # model_validator de UsuarioCreate).
     password_hash = None
     if datos.tipo_login == TipoLogin.EMAIL:
         password_hash = _hashear_password(datos.password)
 
-    # Armamos la instancia real del modelo, combinando los datos ya
-    # validados del esquema con el password_hash calculado acá
-    # (que nunca viaja en el esquema de entrada).
     nuevo_usuario = Usuario(
         rol_id=datos.rol_id,
         email=datos.email,
@@ -64,3 +46,72 @@ def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
     )
 
     return repository.crear(db, nuevo_usuario)
+
+
+def obtener_usuario(db: Session, usuario_id: uuid.UUID) -> Usuario:
+    """
+    Busca un usuario por id. A diferencia del repositorio (que devuelve
+    None si no existe), el servicio convierte ese None en una excepción
+    de negocio explícita — quien llame a esta función no tiene que
+    acordarse de chequear None por su cuenta cada vez.
+    """
+    usuario = repository.obtener_por_id(db, usuario_id)
+    if usuario is None:
+        raise NotFoundException(f"No existe un usuario con id {usuario_id}.")
+    return usuario
+
+
+def listar_usuarios(db: Session, skip: int = 0, limit: int = 100) -> list[Usuario]:
+    """
+    Por ahora es un simple 'paso a través' del repositorio, sin reglas de
+    negocio propias. La dejamos igual en el servicio (y no llamamos al
+    repositorio directo desde el endpoint) para mantener siempre el mismo
+    camino de entrada: endpoint -> servicio -> repositorio, sin excepciones
+    a la regla que compliquen entender el flujo más adelante.
+    """
+    return repository.listar(db, skip=skip, limit=limit)
+
+
+def actualizar_usuario(db: Session, usuario_id: uuid.UUID, datos: UsuarioUpdate) -> Usuario:
+    """Aplica cambios parciales sobre un usuario existente."""
+    # Reutilizamos obtener_usuario: si no existe, ya lanza NotFoundException,
+    # y no seguimos ejecutando el resto de la función.
+    usuario = obtener_usuario(db, usuario_id)
+
+    # Si mandaron un email nuevo Y es distinto al que ya tenía, verificamos
+    # que no choque con el de otro usuario (excluyendo al propio usuario
+    # que estamos editando, o siempre se "chocaría consigo mismo").
+    if datos.email and datos.email != usuario.email:
+        existente = repository.obtener_por_email(db, datos.email)
+        if existente and existente.id != usuario.id:
+            raise BusinessException("Ya existe un usuario registrado con ese email.")
+        usuario.email = datos.email
+
+    if datos.telefono and datos.telefono != usuario.telefono:
+        existente = repository.obtener_por_telefono(db, datos.telefono)
+        if existente and existente.id != usuario.id:
+            raise BusinessException("Ya existe un usuario registrado con ese teléfono.")
+        usuario.telefono = datos.telefono
+
+    if datos.rol_id is not None:
+        usuario.rol_id = datos.rol_id
+
+    if datos.tipo_login is not None:
+        usuario.tipo_login = datos.tipo_login
+
+    if datos.password is not None:
+        usuario.password_hash = _hashear_password(datos.password)
+
+    if datos.activo is not None:
+        usuario.activo = datos.activo
+
+    if datos.bloqueado is not None:
+        usuario.bloqueado = datos.bloqueado
+
+    return repository.actualizar(db, usuario)
+
+
+def desactivar_usuario(db: Session, usuario_id: uuid.UUID) -> Usuario:
+    """Desactiva un usuario existente (no lo elimina físicamente)."""
+    usuario = obtener_usuario(db, usuario_id)
+    return repository.desactivar(db, usuario)
