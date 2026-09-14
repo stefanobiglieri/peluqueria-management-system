@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from backend.app.core.config import APP_NAME, APP_VERSION
 from backend.app.api.routes.health import router as health_router
 from backend.app.api.routes.usuario import router as usuario_router
+from backend.app.api.routes.rol import router as rol_router
 
 app = FastAPI(
     title=APP_NAME,
@@ -12,6 +13,7 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(usuario_router)
+app.include_router(rol_router)
 # ==========================================================
 # Archivo: main.py
 # Proyecto: Peluquería Management System
