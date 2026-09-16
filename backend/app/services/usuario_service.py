@@ -19,11 +19,7 @@ from backend.app.schemas.usuario import UsuarioCreate, UsuarioUpdate
 # Nuestras dos excepciones propias.
 from backend.app.core.exceptions import BusinessException, NotFoundException
 
-
-def _hashear_password(password: str) -> str:
-    """Convierte una contraseña en texto plano en su hash con bcrypt."""
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
+from backend.app.core.security import hashear_password
 
 def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
     """Aplica las reglas de negocio para dar de alta un Usuario nuevo."""
@@ -32,10 +28,6 @@ def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
 
     if datos.telefono and repository.obtener_por_telefono(db, datos.telefono):
         raise BusinessException("Ya existe un usuario registrado con ese teléfono.")
-
-    password_hash = None
-    if datos.tipo_login == TipoLogin.EMAIL:
-        password_hash = _hashear_password(datos.password)
 
     nuevo_usuario = Usuario(
         rol_id=datos.rol_id,
@@ -98,9 +90,6 @@ def actualizar_usuario(db: Session, usuario_id: uuid.UUID, datos: UsuarioUpdate)
 
     if datos.tipo_login is not None:
         usuario.tipo_login = datos.tipo_login
-
-    if datos.password is not None:
-        usuario.password_hash = _hashear_password(datos.password)
 
     if datos.activo is not None:
         usuario.activo = datos.activo
