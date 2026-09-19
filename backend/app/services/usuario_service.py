@@ -29,6 +29,14 @@ def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
     if datos.telefono and repository.obtener_por_telefono(db, datos.telefono):
         raise BusinessException("Ya existe un usuario registrado con ese teléfono.")
 
+     # Hasheamos la password recién acá, no antes: si tipo_login=TELEFONO,
+    # datos.password viene vacío (None), y password_hash queda en None
+    # también — coherente con que la columna es NULLABLE justamente para
+    # ese caso, y con el CheckConstraint que exige password_hash SOLO
+    # cuando tipo_login=EMAIL.
+    password_hash = hashear_password(datos.password) if datos.password else None
+
+    
     nuevo_usuario = Usuario(
         rol_id=datos.rol_id,
         email=datos.email,
