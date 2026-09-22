@@ -65,6 +65,17 @@ build/
 *.sql.bak
 
 # ======================================================
+# Documentación interna
+# ======================================================
+
+# Documentacion.docx se edita constantemente en cada sesión de
+# trabajo y no aporta valor versionarlo en git (no es código, y
+# generaría un commit en cada jornada solo por su edición). Se
+# mantiene como respaldo local/personal, fuera del repositorio.
+docs/Documentacion.docx
+
+======================================================
+
 # Archivos del sistema operativo
 # ======================================================
 
