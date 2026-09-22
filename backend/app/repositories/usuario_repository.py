@@ -13,17 +13,21 @@ from backend.app.models.usuario import Usuario
 
 def crear(db: Session, usuario: Usuario) -> Usuario:
     """Inserta un Usuario ya armado en la base de datos."""
-    # add(): le avisa a SQLAlchemy que esta fila es nueva, pero todavía
-    # no ejecuta ningún SQL contra la base.
+    # add(): le avisa a SQLAlchemy que esta fila es nueva.
     db.add(usuario)
 
-    # commit(): ejecuta el INSERT real y confirma la transacción. Es acá
-    # donde, si se viola algún CheckConstraint o UniqueConstraint,
-    # PostgreSQL lo rechaza y SQLAlchemy lanza una excepción (IntegrityError).
-    db.commit()
+    # flush() (NUEVO, reemplaza a commit()): ejecuta el INSERT real
+    # DENTRO de la transacción actual, sin confirmarla todavía. Esto
+    # permite que, si algo viola un CheckConstraint o UniqueConstraint,
+    # el error salte acá mismo (igual que antes con commit), pero SIN
+    # cerrar la transacción — quien llame a esta función decide cuándo
+    # confirmar todo con un commit() propio, lo cual permite que esta
+    # inserción forme parte de una operación más grande (ej. crear un
+    # Cliente junto con su Usuario, todo o nada).
+    db.flush()
 
-    # refresh(): vuelve a leer la fila desde la base, para que el objeto
-    # en memoria quede sincronizado con lo que realmente quedó guardado.
+    # refresh(): sigue funcionando igual después de flush() (no hace
+    # falta que la transacción esté confirmada para releer la fila).
     db.refresh(usuario)
 
     return usuario

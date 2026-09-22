@@ -21,23 +21,23 @@ from backend.app.core.exceptions import BusinessException, NotFoundException
 
 from backend.app.core.security import hashear_password
 
-def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
-    """Aplica las reglas de negocio para dar de alta un Usuario nuevo."""
+def _construir_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
+    """
+    Valida las reglas de negocio y arma (sin guardar todavía) un objeto
+    Usuario nuevo. Separado de crear_usuario() para que otros servicios
+    (como el de Cliente) puedan reutilizar esta validación + armado sin
+    heredar también el commit — ellos van a confirmar la transacción
+    recién cuando terminen de crear TODAS las filas relacionadas.
+    """
     if datos.email and repository.obtener_por_email(db, datos.email):
         raise BusinessException("Ya existe un usuario registrado con ese email.")
 
     if datos.telefono and repository.obtener_por_telefono(db, datos.telefono):
         raise BusinessException("Ya existe un usuario registrado con ese teléfono.")
 
-     # Hasheamos la password recién acá, no antes: si tipo_login=TELEFONO,
-    # datos.password viene vacío (None), y password_hash queda en None
-    # también — coherente con que la columna es NULLABLE justamente para
-    # ese caso, y con el CheckConstraint que exige password_hash SOLO
-    # cuando tipo_login=EMAIL.
     password_hash = hashear_password(datos.password) if datos.password else None
 
-    
-    nuevo_usuario = Usuario(
+    return Usuario(
         rol_id=datos.rol_id,
         email=datos.email,
         telefono=datos.telefono,
@@ -45,8 +45,19 @@ def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
         password_hash=password_hash,
     )
 
-    return repository.crear(db, nuevo_usuario)
 
+def crear_usuario(db: Session, datos: UsuarioCreate) -> Usuario:
+    """
+    Punto de entrada para crear un Usuario de forma AUTÓNOMA (como hace
+    hoy el endpoint POST /api/v1/usuarios): arma el objeto y confirma la
+    transacción en el mismo paso. Quien necesite crear un Usuario como
+    PARTE de algo más grande (ej. Cliente) no debe llamar a esta
+    función, sino a _construir_usuario() + su propio commit().
+    """
+    nuevo_usuario = _construir_usuario(db, datos)
+    usuario = repository.crear(db, nuevo_usuario)
+    db.commit()
+    return usuario
 
 def obtener_usuario(db: Session, usuario_id: uuid.UUID) -> Usuario:
     """
