@@ -8,7 +8,13 @@
 # agregarlos uno por uno en cada lugar donde se necesiten.
 
 from backend.app.models.rol import Rol
+
 from backend.app.models.usuario import Usuario
+
 from backend.app.models.codigo_verificacion import CodigoVerificacion
+
 from backend.app.models.permiso import Permiso
+
 from backend.app.models.rol_permiso import RolPermiso
+
+from backend.app.models.cliente import Cliente
