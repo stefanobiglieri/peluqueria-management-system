@@ -12,6 +12,8 @@ from backend.app.api.routes.auth import router as auth_router
 
 from backend.app.api.routes.permiso import router as permiso_router
 
+from backend.app.api.routes.cliente import router as cliente_router
+
 app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
@@ -23,6 +25,7 @@ app.include_router(usuario_router)
 app.include_router(rol_router)
 app.include_router(auth_router)
 app.include_router(permiso_router)
+app.include_router(cliente_router)
 # ==========================================================
 # Archivo: main.py
 # Proyecto: Peluquería Management System
